@@ -8,3 +8,4 @@ CREATE TABLE IF NOT EXISTS daily_runs (
     status TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
