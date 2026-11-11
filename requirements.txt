@@ -1,0 +1,6 @@
+requests>=2.31.0
+feedparser>=6.0.10
+Pillow>=10.3.0
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+

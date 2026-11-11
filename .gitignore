@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.db
+*.sqlite3
+.env
+temp/
+output/
+*.mp4
+*.png
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
