@@ -1,0 +1,32 @@
+{
+  "Sports": {
+    "badge": "🏏 CRICKET & SPORTS",
+    "hashtag": "#cricket #sports #wtc #indiancricket #ipl",
+    "keywords": ["cricket", "ipl", "bcci", "match", "score", "vs", "cup", "tournament", "football", "messi", "ronaldo", "badminton", "kohli", "rohit", "dhoni", "test", "odi", "t20", "श्रीलंका", "पाकिस्तान", "बनाम"]
+  },
+  "Entertainment": {
+    "badge": "🔥 CINEMA & OTT",
+    "hashtag": "#bollywood #cinema #ott #netflix #movies",
+    "keywords": ["movie", "trailer", "actor", "actress", "release date", "review", "song", "teaser", "ott", "netflix", "box office", "cinema", "jailer", "rajinikanth", "kantara", "pushpa", "bollywood"]
+  },
+  "Politics": {
+    "badge": "🚨 POLITICS & BIG STATEMENT",
+    "hashtag": "#politics #indianews #currentaffairs #breakingnews",
+    "keywords": ["bjp", "congress", "sonia", "rahul", "modi", "mukherjee", "parliament", "election", "minister", "government", "scandal", "bill", "court", "केन्द्र", "ప్రభుత్వం"]
+  },
+  "Technology": {
+    "badge": "💡 TECH & AI",
+    "hashtag": "#tech #ai #innovation #technews #google",
+    "keywords": ["ai", "chatgpt", "gemini", "deepseek", "google", "apple", "iphone", "cloud", "update", "launch", "app", "feature", "nvidia", "meta", "software"]
+  },
+  "Business": {
+    "badge": "📈 BUSINESS & MARKETS",
+    "hashtag": "#business #markets #stocks #finance #economy",
+    "keywords": ["share price", "stock", "sensex", "nifty", "gold rate", "silver", "ipo", "crypto", "bitcoin", "market", "rbi", "budget", "gdp", "yusuff ali", "bank"]
+  },
+  "General": {
+    "badge": "⚡ INDIA TRENDING",
+    "hashtag": "#trending #india #trendbharat #instatrend #viral",
+    "keywords": []
+  }
+}
