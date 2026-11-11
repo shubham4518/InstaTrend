@@ -62,29 +62,45 @@ class EntityEnricher:
 
         final_image = hd_image or fallback_pic
 
-        # Build punchy headline & statement
+        # Clean source attribution from headline (e.g. " - NDTV News" or " | India Today")
         if news_title:
-            headline = news_title
+            clean_headline = re.sub(r"\s+[-|]\s+[^-|]+$", "", news_title).strip()
         else:
-            headline = f"Massive Search Spike in India for {query.title()}"
+            clean_headline = f"Massive Search Spike in India for {query.title()}"
 
-        # Extract statement if quotes exist, else formulate strong hook
+        # Extract meaningful statement (at least 3 words) or craft an impactful takeaway
+        statement = ""
         quotes = re.findall(r"['\"‘“](.*?)['\"’”]", news_title)
-        if quotes:
-            statement = f"“{quotes[0]}”"
-        else:
-            statement = f"“High volume surge: Millions of Indian netizens search for updates on {query.title()}”"
+        for q in quotes:
+            if len(q.split()) >= 3:
+                statement = f"“{q.strip()}”"
+                break
 
-        context = (
-            news_snippet
-            or wiki_extract
-            or f"Trending searches across India reflect massive public curiosity on {query}."
-        )
+        if not statement and news_snippet:
+            snip_quotes = re.findall(r"['\"‘“](.*?)['\"’”]", news_snippet)
+            for q in snip_quotes:
+                if len(q.split()) >= 3:
+                    statement = f"“{q.strip()}”"
+                    break
+
+        if not statement:
+            statement = f"“Key Update: Massive surge across India with millions following {query.title()}”"
+
+        # Provide complete factual background (who, what, why)
+        if news_snippet and len(news_snippet.split()) > 6:
+            context = news_snippet
+        elif wiki_extract:
+            sentences = wiki_extract.split(". ")
+            context = ". ".join(sentences[:2]).strip()
+            if not context.endswith("."):
+                context += "."
+        else:
+            context = f"Reports confirm significant national interest and discussions around {query} today."
 
         return {
             **trend_item,
             "hd_image_url": final_image,
-            "headline": headline,
+            "headline": clean_headline,
             "statement": statement,
             "context": context,
         }
