@@ -45,16 +45,35 @@ def test_database_manager():
         db_file = Path(tmpdir) / "test.db"
         db = DatabaseManager(str(db_file))
 
-        assert db.check_already_run_today("2026-11-13") is False
+        assert db.check_all_completed_today("2026-11-13", required_count=3) is False
 
-        sample_story = {
-            "query": "Test Topic",
-            "category": "General",
-            "headline": "Test Headline",
-            "hd_image_url": "https://example.com/test.jpg",
+        sample_story_1 = {
+            "query": "Topic 1",
+            "category": "Sports",
+            "headline": "Headline 1",
+            "hd_image_url": "https://example.com/1.jpg",
         }
-        db.record_run("2026-11-13", sample_story, status="completed")
-        assert db.check_already_run_today("2026-11-13") is True
+        sample_story_2 = {
+            "query": "Topic 2",
+            "category": "Cinema",
+            "headline": "Headline 2",
+            "hd_image_url": "https://example.com/2.jpg",
+        }
+        sample_story_3 = {
+            "query": "Topic 3",
+            "category": "Politics",
+            "headline": "Headline 3",
+            "hd_image_url": "https://example.com/3.jpg",
+        }
+
+        db.record_run("2026-11-13", sample_story_1, post_index=1, status="completed")
+        assert db.check_post_completed("2026-11-13", post_index=1) is True
+        assert db.check_all_completed_today("2026-11-13", required_count=3) is False
+
+        db.record_run("2026-11-13", sample_story_2, post_index=2, status="completed")
+        db.record_run("2026-11-13", sample_story_3, post_index=3, status="completed")
+
+        assert db.check_all_completed_today("2026-11-13", required_count=3) is True
 
 
 def test_post_builder_text_wrapping():
@@ -62,4 +81,3 @@ def test_post_builder_text_wrapping():
     font = builder._get_font("Test", 30, bold=True)
     wrapped = builder._wrap_text("This is a long news headline for testing text wrapping", font, max_width=200)
     assert len(wrapped) > 1
-

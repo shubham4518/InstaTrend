@@ -1,5 +1,5 @@
 """Main Orchestrator CLI for TrendBharat.
-Collects top daily trend, generates viral RVCJ-style post, and delivers directly to Telegram.
+Collects top daily trends, generates viral 3-tier news card posts, and delivers directly to Telegram.
 """
 
 import argparse
@@ -7,6 +7,7 @@ import datetime
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,14 +24,15 @@ logger = logging.getLogger("trendbharat.runner")
 
 def main():
     parser = argparse.ArgumentParser(description="TrendBharat Daily Orchestrator")
-    parser.add_argument("--dry-run", action="store_true", help="Render post locally without sending to Telegram")
-    parser.add_argument("--post-now", action="store_true", help="Deliver today's post and caption to Telegram")
+    parser.add_argument("--dry-run", action="store_true", help="Render posts locally without sending to Telegram")
+    parser.add_argument("--post-now", action="store_true", help="Deliver daily posts and captions to Telegram")
     parser.add_argument("--force-date", type=str, help="Override date in YYYY-MM-DD format")
+    parser.add_argument("--count", type=int, default=3, help="Number of daily posts to generate and send (default: 3)")
     args = parser.parse_args()
 
     load_dotenv()
     today_str = args.force_date or datetime.date.today().isoformat()
-    logger.info("Executing TrendBharat daily pipeline for %s...", today_str)
+    logger.info("Executing TrendBharat daily pipeline for %s (Target: %d posts)...", today_str, args.count)
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
@@ -56,57 +58,76 @@ def main():
     db = DatabaseManager(db_path)
     notifier = TelegramDeliveryBot(bot_token, chat_id)
 
-    # 1. Idempotency Check
-    if db.check_already_run_today(today_str) and not args.dry_run:
-        logger.info("Today's run for %s already completed! Exiting.", today_str)
+    # 1. Check if all required posts for today are already completed
+    if db.check_all_completed_today(today_str, required_count=args.count) and not args.dry_run:
+        logger.info("All %d posts for %s are already completed! Exiting.", args.count, today_str)
         sys.exit(0)
 
     try:
-        # 2. Ingest & Enrich Top Trending Story
-        logger.info("[1/4] Collecting & enriching top trending story from Google...")
+        # 2. Ingest & Enrich Top Trending Stories
+        logger.info("[1/4] Collecting top %d trending stories from Google Trends...", args.count)
         config_dir = Path("trendbharat/config")
         collector = TrendsPipeline(config_dir)
-        story = collector.get_top_story()
+        stories = collector.get_top_stories(limit=args.count)
 
-        logger.info("Top Story: %s (%s)", story["query"], story["category"])
-        logger.info("Headline: %s", story["headline"])
-        logger.info("Statement: %s", story["statement"])
+        logger.info("Successfully fetched and enriched %d stories.", len(stories))
 
-        # 3. Render RVCJ Style Post (1080x1350 4:5 portrait)
-        logger.info("[2/4] Rendering viral RVCJ-style white theme feed post...")
         out_dir = Path("temp/daily_posts")
         out_dir.mkdir(parents=True, exist_ok=True)
-        image_path = str(out_dir / f"post_{today_str}.jpg")
-
         builder = RVCJPostBuilder()
-        builder.render(
-            badge_text=story["badge"],
-            headline=story["headline"],
-            red_statement=story["statement"],
-            context=story["context"],
-            image_url=story.get("hd_image_url"),
-            output_path=image_path,
-            handle="@InstaTrend",
-        )
-        logger.info("Image successfully generated: %s", image_path)
 
-        # 4. Generate Instagram Caption
-        logger.info("[3/4] Generating viral Instagram caption...")
-        caption = build_instagram_caption(story, handle="@InstaTrend")
+        # 3. Process Each Story
+        delivered_count = 0
+        for idx, story in enumerate(stories, start=1):
+            logger.info(
+                "--- Processing Post #%d of %d: %s (%s) ---",
+                idx,
+                len(stories),
+                story["query"],
+                story["category"],
+            )
+            logger.info("Headline: %s", story["headline"])
+            logger.info("Statement: %s", story["statement"])
 
-        # 5. Delivery & State Tracking
-        if args.dry_run:
-            logger.info("[DRY RUN COMPLETE] Post saved at %s", image_path)
-            print(f"\n--- GENERATED CAPTION ---\n{caption}\n")
-            sys.exit(0)
+            image_path = str(out_dir / f"post_{today_str}_{idx}.jpg")
+            builder.render(
+                badge_text=story["badge"],
+                headline=story["headline"],
+                red_statement=story["statement"],
+                context=story["context"],
+                image_url=story.get("hd_image_url"),
+                output_path=image_path,
+                handle="@InstaTrend",
+            )
+            logger.info("Image #%d generated: %s", idx, image_path)
 
-        logger.info("[4/4] Delivering post package to Telegram...")
-        success = notifier.send_post_package(image_path, caption, story["query"].title())
-        if success:
-            db.record_run(today_str, story, status="completed")
-            logger.info("Pipeline completed successfully for %s!", today_str)
-        else:
-            raise RuntimeError("Failed to deliver post package to Telegram.")
+            caption = build_instagram_caption(story, handle="@InstaTrend")
+
+            if args.dry_run:
+                logger.info("[DRY RUN] Post #%d saved at %s", idx, image_path)
+                print(f"\n=================== CAPTION #{idx} ===================\n{caption}\n")
+                continue
+
+            # Deliver Post Package to Telegram
+            logger.info("Delivering Post #%d to Telegram...", idx)
+            success = notifier.send_post_package(
+                image_path=image_path,
+                caption=caption,
+                topic_name=story["query"].title(),
+                post_index=idx,
+                total_posts=len(stories),
+            )
+            if success:
+                db.record_run(today_str, story, post_index=idx, status="completed")
+                delivered_count += 1
+                logger.info("Delivered post #%d to Telegram!", idx)
+                if idx < len(stories):
+                    time.sleep(2)  # Pause between Telegram messages to avoid rate limits
+            else:
+                logger.error("Failed to deliver post #%d to Telegram.", idx)
+
+        if not args.dry_run:
+            logger.info("Daily pipeline completed: %d/%d posts delivered to Telegram!", delivered_count, len(stories))
 
     except Exception as e:
         logger.exception("Pipeline crashed: %s", e)

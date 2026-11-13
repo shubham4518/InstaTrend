@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from trendbharat.collector.enricher import EntityEnricher
 from trendbharat.collector.feed_reader import FeedReader
@@ -42,13 +42,19 @@ class TrendsPipeline:
         general = self.categories["General"]
         return "General", general["badge"], general["hashtag"]
 
-    def get_top_story(self) -> Dict:
-        """Pulls live trends, filters unsafe items, and enriches the #1 top story."""
+    def get_top_stories(self, limit: int = 3) -> List[Dict]:
+        """Pulls live trends, filters unsafe items, and enriches top distinct stories."""
         raw_xml = self.feed_reader.fetch_raw_feed()
         items = self.feed_reader.parse_feed(raw_xml)
 
         valid_items = []
+        seen_queries = set()
+
         for it in items:
+            q_norm = it["query"].strip().lower()
+            if q_norm in seen_queries:
+                continue
+
             blocked, reason = self.is_blocked(f"{it['query']} {it['news_title']}")
             if not blocked:
                 cat_name, badge, hashtags = self.categorize(it["query"], it["news_title"])
@@ -56,14 +62,25 @@ class TrendsPipeline:
                 it["badge"] = badge
                 it["hashtags"] = hashtags
                 valid_items.append(it)
+                seen_queries.add(q_norm)
             else:
                 logger.warning("Filtered unsafe topic '%s': %s", it["query"], reason)
 
         if not valid_items:
             raise RuntimeError("No valid trending stories found after safety filtering.")
 
-        # Pick the top story and enrich it with HD image & context
-        top_item = valid_items[0]
-        enriched = self.enricher.enrich_trend(top_item)
-        logger.info("Successfully selected & enriched top story: %s", enriched["query"])
-        return enriched
+        # Pick the top distinct stories up to the limit
+        selected = valid_items[:limit]
+        enriched_stories = []
+
+        for idx, item in enumerate(selected, start=1):
+            enriched = self.enricher.enrich_trend(item)
+            enriched["post_index"] = idx
+            logger.info("Enriched story #%d: %s (%s)", idx, enriched["query"], enriched["category"])
+            enriched_stories.append(enriched)
+
+        return enriched_stories
+
+    def get_top_story(self) -> Dict:
+        """Backward compatibility: returns top 1 story."""
+        return self.get_top_stories(limit=1)[0]

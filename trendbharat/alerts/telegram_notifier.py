@@ -16,7 +16,14 @@ class TelegramDeliveryBot:
         self.chat_id = str(chat_id).strip() if chat_id else ""
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
 
-    def send_post_package(self, image_path: str, caption: str, topic_name: str) -> bool:
+    def send_post_package(
+        self,
+        image_path: str,
+        caption: str,
+        topic_name: str,
+        post_index: int = 1,
+        total_posts: int = 1,
+    ) -> bool:
         """
         Sends the 1080x1350 feed post image directly to your Telegram chat,
         followed by a 1-tap copyable caption message.
@@ -30,14 +37,17 @@ class TelegramDeliveryBot:
 
         # 1. Send High-Res Photo
         photo_url = f"{self.base_url}/sendPhoto"
-        logger.info("Uploading post image to Telegram chat %s...", self.chat_id)
+        logger.info("Uploading post #%d/%d to Telegram chat %s...", post_index, total_posts, self.chat_id)
 
         try:
             safe_topic = html.escape(topic_name)
+            count_label = (
+                f"Post #{post_index} of {total_posts}" if total_posts > 1 else "Today's Top Trend"
+            )
             with open(image_path, "rb") as f:
                 files = {"photo": f}
                 cap_text = (
-                    f"🚀 <b>Today's Top Trend:</b> <code>{safe_topic}</code>\n"
+                    f"🚀 <b>{count_label}:</b> <code>{safe_topic}</code>\n"
                     "📸 High-res 4:5 feed image ready to share!"
                 )
                 data = {
@@ -53,9 +63,14 @@ class TelegramDeliveryBot:
             # 2. Send 1-Tap Copyable Caption in Next Message
             msg_url = f"{self.base_url}/sendMessage"
             safe_caption = html.escape(caption)
+            cap_header = (
+                f"📋 <b>Instagram Caption #{post_index} (Tap & hold to copy):</b>"
+                if total_posts > 1
+                else "📋 <b>Instagram Caption (Tap & hold to copy):</b>"
+            )
             cap_data = {
                 "chat_id": self.chat_id,
-                "text": f"📋 <b>Instagram Caption (Tap & hold to copy):</b>\n\n{safe_caption}",
+                "text": f"{cap_header}\n\n{safe_caption}",
                 "parse_mode": "HTML",
                 "disable_web_page_preview": True,
             }
@@ -64,7 +79,7 @@ class TelegramDeliveryBot:
                 logger.error("Telegram caption send failed (status %d): %s", c_resp.status_code, c_resp.text)
             c_resp.raise_for_status()
 
-            logger.info("Successfully delivered post package to Telegram!")
+            logger.info("Successfully delivered post #%d/%d package to Telegram!", post_index, total_posts)
             return True
         except requests.RequestException as e:
             logger.error("Failed to deliver post package to Telegram: %s", e)
