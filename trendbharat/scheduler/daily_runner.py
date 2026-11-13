@@ -32,9 +32,26 @@ def main():
     today_str = args.force_date or datetime.date.today().isoformat()
     logger.info("Executing TrendBharat daily pipeline for %s...", today_str)
 
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     db_path = os.getenv("DATABASE_PATH", "trendbharat.db")
+
+    if not args.dry_run:
+        if not bot_token or not chat_id:
+            logger.error(
+                "\n=======================================================\n"
+                "CRITICAL ERROR: Telegram credentials are not configured!\n"
+                "- TELEGRAM_BOT_TOKEN: %s\n"
+                "- TELEGRAM_CHAT_ID: %s\n\n"
+                "If running on GitHub Actions:\n"
+                "1. Go to repository Settings -> Secrets and variables -> Actions\n"
+                "2. Click 'New repository secret'\n"
+                "3. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID\n"
+                "=======================================================",
+                "Configured" if bot_token else "MISSING",
+                "Configured" if chat_id else "MISSING",
+            )
+            sys.exit(1)
 
     db = DatabaseManager(db_path)
     notifier = TelegramDeliveryBot(bot_token, chat_id)

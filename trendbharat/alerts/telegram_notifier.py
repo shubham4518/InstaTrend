@@ -2,6 +2,7 @@
 Delivers ready-to-post high-definition JPEG images & captions directly to your phone.
 """
 
+import html
 import logging
 
 import requests
@@ -11,17 +12,20 @@ logger = logging.getLogger(__name__)
 
 class TelegramDeliveryBot:
     def __init__(self, bot_token: str, chat_id: str):
-        self.bot_token = bot_token
-        self.chat_id = chat_id
-        self.base_url = f"https://api.telegram.org/bot{bot_token}"
+        self.bot_token = bot_token.strip() if bot_token else ""
+        self.chat_id = str(chat_id).strip() if chat_id else ""
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
 
     def send_post_package(self, image_path: str, caption: str, topic_name: str) -> bool:
         """
         Sends the 1080x1350 feed post image directly to your Telegram chat,
-        followed by a 1-tap copyable caption message!
+        followed by a 1-tap copyable caption message.
         """
         if not self.bot_token or not self.chat_id:
-            logger.error("Telegram bot token or chat ID is missing!")
+            logger.error(
+                "Telegram bot token or chat ID is missing! "
+                "(Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env or GitHub Secrets)"
+            )
             return False
 
         # 1. Send High-Res Photo
@@ -29,24 +33,35 @@ class TelegramDeliveryBot:
         logger.info("Uploading post image to Telegram chat %s...", self.chat_id)
 
         try:
+            safe_topic = html.escape(topic_name)
             with open(image_path, "rb") as f:
                 files = {"photo": f}
+                cap_text = (
+                    f"🚀 <b>Today's Top Trend:</b> <code>{safe_topic}</code>\n"
+                    "📸 High-res 4:5 feed image ready to share!"
+                )
                 data = {
                     "chat_id": self.chat_id,
-                    "caption": f"🚀 *Today's Top Trend:* `{topic_name}`\n📸 High-res 4:5 feed image ready to share!",
-                    "parse_mode": "Markdown",
+                    "caption": cap_text,
+                    "parse_mode": "HTML",
                 }
                 resp = requests.post(photo_url, data=data, files=files, timeout=30)
+                if resp.status_code != 200:
+                    logger.error("Telegram photo upload failed (status %d): %s", resp.status_code, resp.text)
                 resp.raise_for_status()
 
             # 2. Send 1-Tap Copyable Caption in Next Message
             msg_url = f"{self.base_url}/sendMessage"
+            safe_caption = html.escape(caption)
             cap_data = {
                 "chat_id": self.chat_id,
-                "text": f"📋 *Instagram Caption (Tap & hold to copy):*\n\n{caption}",
+                "text": f"📋 <b>Instagram Caption (Tap & hold to copy):</b>\n\n{safe_caption}",
+                "parse_mode": "HTML",
                 "disable_web_page_preview": True,
             }
             c_resp = requests.post(msg_url, json=cap_data, timeout=15)
+            if c_resp.status_code != 200:
+                logger.error("Telegram caption send failed (status %d): %s", c_resp.status_code, c_resp.text)
             c_resp.raise_for_status()
 
             logger.info("Successfully delivered post package to Telegram!")
@@ -56,11 +71,20 @@ class TelegramDeliveryBot:
             return False
 
     def send_failure_alert(self, stage: str, error_msg: str):
+        if not self.bot_token or not self.chat_id:
+            return
         msg_url = f"{self.base_url}/sendMessage"
+        safe_stage = html.escape(stage)
+        safe_err = html.escape(error_msg[:300])
+        msg_text = (
+            f"🚨 <b>TrendBharat Pipeline Alert!</b>\n\n"
+            f"💥 <b>Failed Stage:</b> <code>{safe_stage}</code>\n"
+            f"⚠️ <b>Error:</b> <code>{safe_err}</code>"
+        )
         data = {
             "chat_id": self.chat_id,
-            "text": f"🚨 *TrendBharat Pipeline Alert!*\n\n💥 *Failed Stage:* `{stage}`\n⚠️ *Error:* `{error_msg[:300]}`",
-            "parse_mode": "Markdown",
+            "text": msg_text,
+            "parse_mode": "HTML",
         }
         try:
             requests.post(msg_url, json=data, timeout=10)

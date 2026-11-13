@@ -28,6 +28,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Verify Secrets Configuration
+        run: |
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] || [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            echo "::error title=Missing Telegram Secrets::TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from GitHub Secrets! Please navigate to Settings -> Secrets and variables -> Actions -> New repository secret to add them."
+            exit 1
+          fi
+
       - name: Run TrendBharat Pipeline
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -43,3 +50,4 @@ jobs:
           path: temp/daily_posts/
           if-no-files-found: ignore
           retention-days: 7
+
