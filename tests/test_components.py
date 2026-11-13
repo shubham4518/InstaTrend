@@ -62,3 +62,4 @@ def test_post_builder_text_wrapping():
     font = builder._get_font("Test", 30, bold=True)
     wrapped = builder._wrap_text("This is a long news headline for testing text wrapping", font, max_width=200)
     assert len(wrapped) > 1
+
