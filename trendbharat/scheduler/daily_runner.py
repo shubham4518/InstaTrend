@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--post-now", action="store_true", help="Deliver daily posts and captions to Telegram")
     parser.add_argument("--force-date", type=str, help="Override date in YYYY-MM-DD format")
     parser.add_argument("--count", type=int, default=3, help="Number of daily posts to generate and send (default: 3)")
+    parser.add_argument("--force", action="store_true", help="Force run even if already completed today")
     args = parser.parse_args()
 
     load_dotenv()
@@ -59,8 +60,12 @@ def main():
     notifier = TelegramDeliveryBot(bot_token, chat_id)
 
     # 1. Check if all required posts for today are already completed
-    if db.check_all_completed_today(today_str, required_count=args.count) and not args.dry_run:
-        logger.info("All %d posts for %s are already completed! Exiting.", args.count, today_str)
+    if not args.force and db.check_all_completed_today(today_str, required_count=args.count) and not args.dry_run:
+        logger.info(
+            "All %d posts for %s are already completed! (Use --force to run anyway). Exiting.",
+            args.count,
+            today_str,
+        )
         sys.exit(0)
 
     try:

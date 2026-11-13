@@ -83,8 +83,13 @@ class EntityEnricher:
                     statement = f"“{q.strip()}”"
                     break
 
+        is_hindi = any("\u0900" <= c <= "\u097f" for c in f"{query} {clean_headline}")
+
         if not statement:
-            statement = f"“Key Update: Massive surge across India with millions following {query.title()}”"
+            if is_hindi:
+                statement = f"“{clean_headline}”"
+            else:
+                statement = f"“Key Update: Massive surge across India with millions following {query.title()}”"
 
         # Provide complete factual background (who, what, why)
         if news_snippet and len(news_snippet.split()) > 6:
@@ -94,6 +99,8 @@ class EntityEnricher:
             context = ". ".join(sentences[:2]).strip()
             if not context.endswith("."):
                 context += "."
+        elif is_hindi:
+            context = f"ताज़ा रिपोर्ट्स के अनुसार {query} को लेकर देश भर में भारी चर्चा देखी जा रही है।"
         else:
             context = f"Reports confirm significant national interest and discussions around {query} today."
 

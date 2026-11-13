@@ -39,7 +39,9 @@ class RVCJPostBuilder:
 
     def _get_font(self, text: str, size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
         font_path = self.font_bold if bold else self.font_regular
-        if any("\u0900" <= c <= "\u097f" for c in text) and os.path.exists(self.font_devanagari):
+        dev_chars = sum(1 for c in text if "\u0900" <= c <= "\u097f")
+        lat_chars = sum(1 for c in text if "a" <= c.lower() <= "z")
+        if dev_chars > lat_chars and os.path.exists(self.font_devanagari):
             font_path = self.font_devanagari
         elif any("\u0b80" <= c <= "\u0bff" for c in text) and os.path.exists(self.font_tamil):
             font_path = self.font_tamil

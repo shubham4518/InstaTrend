@@ -49,6 +49,7 @@ class TrendsPipeline:
 
         valid_items = []
         seen_queries = set()
+        seen_titles: List[set] = []
 
         for it in items:
             q_norm = it["query"].strip().lower()
@@ -56,15 +57,28 @@ class TrendsPipeline:
                 continue
 
             blocked, reason = self.is_blocked(f"{it['query']} {it['news_title']}")
-            if not blocked:
-                cat_name, badge, hashtags = self.categorize(it["query"], it["news_title"])
-                it["category"] = cat_name
-                it["badge"] = badge
-                it["hashtags"] = hashtags
-                valid_items.append(it)
-                seen_queries.add(q_norm)
-            else:
+            if blocked:
                 logger.warning("Filtered unsafe topic '%s': %s", it["query"], reason)
+                continue
+
+            # Check for duplicate topic overlap (e.g. English & Hindi query for same event)
+            current_tokens = set(re.findall(r"\b[A-Za-z0-9]{4,}\b", it["news_title"].lower()))
+            overlap = False
+            for prev_tokens in seen_titles:
+                if len(current_tokens.intersection(prev_tokens)) >= 2:
+                    overlap = True
+                    break
+            if overlap:
+                continue
+
+            cat_name, badge, hashtags = self.categorize(it["query"], it["news_title"])
+            it["category"] = cat_name
+            it["badge"] = badge
+            it["hashtags"] = hashtags
+            valid_items.append(it)
+            seen_queries.add(q_norm)
+            if current_tokens:
+                seen_titles.append(current_tokens)
 
         if not valid_items:
             raise RuntimeError("No valid trending stories found after safety filtering.")
